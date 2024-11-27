@@ -1,10 +1,12 @@
+import os
+import tempfile
+
+import pandas as pd
 import pytest
 from datasets import load_dataset
-import pandas as pd
 from sklearn.metrics import accuracy_score, f1_score
+
 from topic_autolabel import process_file
-import tempfile
-import os
 
 
 def test_sentiment_classification():
@@ -16,7 +18,7 @@ def test_sentiment_classification():
     
     df = pd.DataFrame(dataset).sample(n=200, random_state=42)
     
-    df['label'] = df['label'].map({1: "positive", 0: "negative"})
+    df['label'] = df['label'].apply(lambda x: "positive" if x == 1 else "negative")
     df = df.rename(columns={"text": "review"})
     
     with tempfile.NamedTemporaryFile(suffix='.csv', mode='w', delete=False) as f:
@@ -31,8 +33,10 @@ def test_sentiment_classification():
             candidate_labels=candidate_labels
         )
         result_df['label'] = result_df['label'].replace("<err>", candidate_labels[0])
-        accuracy = accuracy_score(df['label'], result_df['label'])
-        f1 = f1_score(df['label'], result_df['label'], pos_label="positive")
+        y_true = (df['label'] == "positive").astype(int)
+        y_pred = (result_df['label'] == "positive").astype(int)
+        accuracy = accuracy_score(y_true, y_pred)
+        f1 = f1_score(y_true, y_pred)
         print(f"Accuracy: {accuracy:.2%}")
         print(f"F1 Score: {f1:.2%}")
         

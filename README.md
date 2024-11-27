@@ -4,6 +4,8 @@ Given text data, generates labels to classify the data into a set number of topi
 ---
 ## Example usage:
 
+First, install the package with pip: ```pip install topic_autolabel```
+
 ```
 # Labelling with supplied labels
 from topic_autolabel import process_file
