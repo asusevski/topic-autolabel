@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "topic-autolabel"
+version = "0.1.0"
+description = "Automatic topic labeling using LLMs"
+authors = [
+    {name = "Anthony Susevski", email = "asusevski@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.10"
+
+
+dependencies = [
+    "pytest",
+
+    "pandas",
+    "datasets",
+    "scikit-learn",
+
+    "instructor",
+    "torch",
+    "transformers"
+]
+
+[project.optional-dependencies]
+dev = [
+    "black==24.10.0",
+    "ruff==0.8.0",
+    "isort==5.13.2",
+    "pyright==1.1.389",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.black]
+line-length = 88
+
+[tool.isort]
+profile = "black"
+
+[tool.ruff]
+line-length = 88
+include = ["src/*"]
+exclude = [".venv*", "**/__pycache__", "*.ipynb"]
+
+[tool.ruff.lint.per-file-ignores]
+"**/__init__.py" = ["F401"]
+
+[tool.pyright]
+include = ["src/*"]
+exclude = [".venv*", "**/__pycache__", "**/__init__.py", "data/*"]
+typeCheckingMode = "standard"
