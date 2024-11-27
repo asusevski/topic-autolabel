@@ -14,10 +14,11 @@ import pandas as pd
 df = pd.read_csv('path/to/file')
 candidate_labels = ["positive", "negative"]
 
-## labelling column "review" with "positive" or "negative"
+# labelling column "review" with "positive" or "negative"
 new_df = process_file(
     filepath=temp_filepath,
     text_column="review",
-    candidate_labels=candidate_labels
+    candidate_labels=candidate_labels,
+    model_name="meta-llama/Llama-3.1-8B-Instruct" # default model to pull from huggingface hub
 )
 ```
