@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "topic-autolabel"
-version = "0.1.0"
+version = "0.1.1"
 description = "Automatic topic labeling using LLMs"
 authors = [
     {name = "Anthony Susevski", email = "asusevski@gmail.com"}
@@ -24,6 +24,7 @@ dependencies = [
     "torch",
     "transformers"
 ]
+urls = {Repository = "https://github.com/asusevski/topic-autolabel"}
 
 [project.optional-dependencies]
 dev = [
