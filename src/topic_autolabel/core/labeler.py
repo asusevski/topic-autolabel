@@ -1,9 +1,9 @@
-from typing import List, Optional, Union
-from typing import List, Optional, Union
-import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
 import re
 from collections import Counter
+from typing import List, Optional, Union
+
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
 
 class TopicLabeler:
@@ -50,7 +50,7 @@ Three comma separated words:"""
         self,
         texts: Union[str, List[str]],
         num_labels: int = 5,
-        candidate_labels: Optional[List[str]] = None
+        candidate_labels: Optional[List[str]] = None,
     ) -> List[str]:
         """
         Generate labels for the given texts.
@@ -62,10 +62,10 @@ Three comma separated words:"""
             max_tokens = max(
                 [len(self.tokenizer(x)["input_ids"]) for x in candidate_labels]
             )
-            pattern = r''
+            pattern = r""
         else:
             max_tokens = 50
-            pattern = r'^\w+,\s*\w+,\s*\w+' 
+            pattern = r"^\w+,\s*\w+,\s*\w+"
 
         labels = []
         for text in texts:
@@ -101,13 +101,11 @@ Three comma separated words:"""
             ## Re-label with most common terms
             counts = Counter(word for sublist in labels for word in sublist)
             try:
-                assert(num_labels) <= len(counts)
+                assert (num_labels) <= len(counts)
             except AssertionError:
                 raise Exception
             top_labels = [x[0] for x in counts.most_common(num_labels)]
-            max_tokens = max(
-                [len(self.tokenizer(x)["input_ids"]) for x in top_labels]
-            ) 
+            max_tokens = max([len(self.tokenizer(x)["input_ids"]) for x in top_labels])
             # TODO: filter top labels w/ embeddings and maybe remove generic labels via clustering?
             # re-label with top labels
             final_labels = []
@@ -125,13 +123,12 @@ Three comma separated words:"""
                 prompt_length = inputs["input_ids"].shape[1]
                 response = self.tokenizer.decode(outputs[0][prompt_length:])
                 response = response.lower().strip()
-                len_before = len(top_labels)
-                found = False 
+                found = False
                 for label in top_labels:
                     if label in response:
                         final_labels.append(label)
                         found = True
                         break
-                if found == False:
+                if not found:
                     final_labels.append("<err>")
             return final_labels

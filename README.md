@@ -16,7 +16,7 @@ candidate_labels = ["positive", "negative"]
 
 # labelling column "review" with "positive" or "negative"
 new_df = process_file(
-    filepath=temp_filepath,
+    df=df,
     text_column="review",
     candidate_labels=candidate_labels,
     model_name="meta-llama/Llama-3.1-8B-Instruct" # default model to pull from huggingface hub
@@ -33,7 +33,7 @@ df = pd.read_csv('path/to/file')
 
 # labelling column "review" with open-ended labels (best results when dataset talks about many topics)
 new_df = process_file(
-    filepath=temp_filepath,
+    df=df,
     text_column="review",
     model_name="meta-llama/Llama-3.1-8B-Instruct",
     num_labels=5 # generate up to 5 labels for each of the rows

@@ -11,6 +11,7 @@ def process_file(
     text_column: str,
     model_name: str = "meta-llama/Llama-3.1-8B-Instruct",
     num_labels: int = 5,
+    df: Optional[pd.DataFrame] = None,
     candidate_labels: Optional[List[str]] = None,
 ) -> pd.DataFrame:
     """
@@ -27,7 +28,8 @@ def process_file(
         DataFrame with a new 'label' column containing the generated labels
     """
     # Load the data
-    df = load_data(filepath, text_column)
+    if df is None:
+        df = load_data(filepath, text_column)
 
     # Initialize the labeler
     labeler = TopicLabeler(model_name=model_name)
