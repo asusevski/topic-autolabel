@@ -13,6 +13,7 @@ def process_file(
     num_labels: int = 5,
     df: Optional[pd.DataFrame] = None,
     candidate_labels: Optional[List[str]] = None,
+    batch_size: Optional[int] = 8
 ) -> pd.DataFrame:
     """
     Process a file and add topic labels to it.
@@ -32,7 +33,7 @@ def process_file(
         df = load_data(filepath, text_column)
 
     # Initialize the labeler
-    labeler = TopicLabeler(model_name=model_name)
+    labeler = TopicLabeler(model_name=model_name, batch_size=batch_size)
 
     # Generate labels
     labels = labeler.generate_labels(
