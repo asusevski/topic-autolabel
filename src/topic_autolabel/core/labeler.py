@@ -56,8 +56,8 @@ class TopicLabeler:
         # Tokenize all prompts at once
         inputs = self.tokenizer(
             prompts,
-            # padding=True,
-            # truncation=True,
+            #padding=True,
+            truncation=True,
             return_tensors="pt",
         ).to(self.device)
         outputs = self.model.generate(
