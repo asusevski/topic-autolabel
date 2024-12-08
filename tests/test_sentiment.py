@@ -30,8 +30,10 @@ def test_sentiment_classification():
         result_df = process_file(
             filepath=temp_filepath,
             text_column="review",
-            candidate_labels=candidate_labels
+            candidate_labels=candidate_labels,
+	    batch_size=1
         )
+        print(result_df['label'].value_counts())
         result_df['label'] = result_df['label'].replace("<err>", candidate_labels[0])
         y_true = (df['label'] == "positive").astype(int)
         y_pred = (result_df['label'] == "positive").astype(int)

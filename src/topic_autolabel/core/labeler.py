@@ -67,7 +67,7 @@ class TopicLabeler:
             input_ids=inputs["input_ids"],
             attention_mask=inputs["attention_mask"],
             max_new_tokens=max_new_tokens,
-            temperature=0.7,
+            temperature=0.3,
             num_return_sequences=1,
             pad_token_id=self.tokenizer.pad_token_id,
         )
@@ -77,7 +77,7 @@ class TopicLabeler:
             prompt_length = inputs["attention_mask"][i].sum()
             response = self.tokenizer.decode(output[prompt_length:], skip_special_tokens=True)
             responses.append(response.lower().strip())
-        
+        print(responses)
         return responses
 
     def _process_open_ended_responses(
@@ -158,6 +158,7 @@ class TopicLabeler:
             return final_labels
         else:
             # Handle classification with candidate labels
+            all_responses = [response.strip().strip('.') for response in all_responses]
             return [
                 response if response in candidate_labels else "<err>"
                 for response in all_responses
