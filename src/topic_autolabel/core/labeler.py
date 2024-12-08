@@ -31,6 +31,9 @@ class TopicLabeler:
         """
         self.device = device
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        if self.tokenizer.pad_token is None:
+            self.tokenizer.pad_token = self.tokenizer.eos_token
+            self.tokenizer.pad_token_id = self.tokenizer.eos_token_id
         self.model = AutoModelForCausalLM.from_pretrained(
             model_name,
             torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
@@ -56,7 +59,7 @@ class TopicLabeler:
         # Tokenize all prompts at once
         inputs = self.tokenizer(
             prompts,
-            #padding=True,
+            padding=True,
             truncation=True,
             return_tensors="pt",
         ).to(self.device)
