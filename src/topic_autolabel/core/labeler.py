@@ -56,8 +56,8 @@ class TopicLabeler:
         # Tokenize all prompts at once
         inputs = self.tokenizer(
             prompts,
-            padding=True,
-            truncation=True,
+            # padding=True,
+            # truncation=True,
             return_tensors="pt",
         ).to(self.device)
         outputs = self.model.generate(
@@ -121,7 +121,6 @@ class TopicLabeler:
         # Create dataset and dataloader for batch processing
         dataset = TextDataset(texts, self.tokenizer)
         dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=False)
-        
         # Calculate max tokens based on labeling mode
         max_tokens = (
             max(len(self.tokenizer(x)["input_ids"]) for x in (candidate_labels or []))
@@ -137,7 +136,6 @@ class TopicLabeler:
         if not candidate_labels:
             # Handle open-ended labeling
             top_labels = self._process_open_ended_responses(all_responses, num_labels)
-            
             # Re-label texts with top labels
             final_labels = []
             for batch_texts in dataloader:
