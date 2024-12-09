@@ -22,7 +22,8 @@ dependencies = [
 
     "instructor",
     "torch",
-    "transformers"
+    "transformers",
+    "sentence-transformers"
 ]
 urls = {Repository = "https://github.com/asusevski/topic-autolabel"}
 

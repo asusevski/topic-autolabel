@@ -28,12 +28,11 @@ def test_sentiment_classification():
     try:
         candidate_labels = ["positive", "negative"]
         result_df = process_file(
-            filepath=temp_filepath,
             text_column="review",
+            filepath=temp_filepath,
             candidate_labels=candidate_labels,
 	    batch_size=1
         )
-        print(result_df['label'].value_counts())
         result_df['label'] = result_df['label'].replace("<err>", candidate_labels[0])
         y_true = (df['label'] == "positive").astype(int)
         y_pred = (result_df['label'] == "positive").astype(int)
@@ -41,7 +40,6 @@ def test_sentiment_classification():
         f1 = f1_score(y_true, y_pred)
         print(f"Accuracy: {accuracy:.2%}")
         print(f"F1 Score: {f1:.2%}")
-        
         assert accuracy >= 0.60, f"Accuracy {accuracy:.2%} below threshold of 60%"
         assert f1 >= 0.60, f"F1 Score {f1:.2%} below threshold of 60%"
         

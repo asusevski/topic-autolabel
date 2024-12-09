@@ -7,13 +7,13 @@ from .core.labeler import TopicLabeler
 
 
 def process_file(
-    filepath: str,
+    filepath: Optional[str],
     text_column: str,
-    model_name: str = "meta-llama/Llama-3.1-8B-Instruct",
-    num_labels: int = 5,
     df: Optional[pd.DataFrame] = None,
+    model_name: str = "meta-llama/Llama-3.1-8B-Instruct",
+    num_labels: Optional[int] = 5,
     candidate_labels: Optional[List[str]] = None,
-    batch_size: Optional[int] = 8
+    batch_size: Optional[int] = 8,
 ) -> pd.DataFrame:
     """
     Process a file and add topic labels to it.
@@ -28,6 +28,11 @@ def process_file(
     Returns:
         DataFrame with a new 'label' column containing the generated labels
     """
+    try:
+        assert filepath is not None or df is not None
+    except AssertionError:
+        raise ValueError("One of filepath or df must be passed to the function.")
+
     # Load the data
     if df is None:
         df = load_data(filepath, text_column)

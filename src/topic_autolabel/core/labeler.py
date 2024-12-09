@@ -1,8 +1,10 @@
 import re
 from collections import Counter
 from typing import List, Optional, Union
-from torch.utils.data import DataLoader, Dataset
+
 import torch
+from sentence_transformers import SentenceTransformer
+from torch.utils.data import DataLoader, Dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 
@@ -24,13 +26,13 @@ class TopicLabeler:
         self,
         model_name: str = "meta-llama/Llama-3.1-8B-Instruct",
         device: str = "cuda" if torch.cuda.is_available() else "cpu",
-        batch_size: int = 8
+        batch_size: int = 8,
     ):
         """
         Initialize the topic labeler with a specified LLM.
         """
         self.device = device
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name, padding_side='left')
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name, padding_side="left")
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
             self.tokenizer.pad_token_id = self.tokenizer.eos_token_id
@@ -39,10 +41,14 @@ class TopicLabeler:
             torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
         ).to(device)
         self.batch_size = batch_size
+        self.similarity_model = SentenceTransformer(
+            "sentence-transformers/all-MiniLM-L6-v2"
+        )
+        if torch.cuda.is_available():
+            self.similarity_model.to(device)
 
-    def _create_prompt(self, 
-                       text: str, 
-                       candidate_labels: Optional[List[str]] = None
+    def _create_prompt(
+        self, text: str, candidate_labels: Optional[List[str]] = None
     ) -> str:
         """Generate appropriate prompt based on labeling mode."""
         if candidate_labels:
@@ -75,20 +81,71 @@ class TopicLabeler:
         responses = []
         for i, output in enumerate(outputs):
             prompt_length = inputs["attention_mask"][i].sum()
-            response = self.tokenizer.decode(output[prompt_length:], skip_special_tokens=True)
+            response = self.tokenizer.decode(
+                output[prompt_length:], skip_special_tokens=True
+            )
             responses.append(response.lower().strip())
-        print(responses)
+        # print(responses)
         return responses
 
+    def _filter_labels_semantic(
+        self, label_counts: Counter, num_labels: int, similarity_threshold: float = 0.50
+    ):
+        """
+        Filter labels semantically using SentenceTransformers by removing similar labels
+        and keeping the most frequent ones.
+
+        Args:
+            label_counts: Counter object containing labels and their counts
+            num_labels: Number of labels to return
+            similarity_threshold: Threshold for cosine similarity (default: 0.7)
+
+        Returns:
+            List of filtered labels
+        """
+        # Sort labels by frequency
+        sorted_labels = sorted(label_counts.items(), key=lambda x: x[1], reverse=True)
+        labels = [label for label, _ in sorted_labels]
+        # Get embeddings for all labels
+        embeddings = self.similarity_model.encode(
+            labels, convert_to_tensor=True, device=self.device
+        )
+        # Calculate cosine similarity matrix
+        similarity_matrix = torch.nn.functional.cosine_similarity(
+            embeddings.unsqueeze(1), embeddings.unsqueeze(0), dim=2
+        )
+        # Filter out similar labels
+        filtered_indices = []
+        for i in range(len(labels)):
+            # Skip if this label is too similar to any already selected label
+            too_similar = False
+            for j in filtered_indices:
+                if i != j and similarity_matrix[i, j] > similarity_threshold:
+                    too_similar = True
+                    break
+            if not too_similar:
+                filtered_indices.append(i)
+            # Break if we have enough labels
+            if len(filtered_indices) == num_labels:
+                break
+        # If we don't have enough labels after filtering, add the next most frequent ones
+        if len(filtered_indices) < num_labels:
+            remaining_indices = [
+                i for i in range(len(labels)) if i not in filtered_indices
+            ]
+            filtered_indices.extend(
+                remaining_indices[: num_labels - len(filtered_indices)]
+            )
+
+        return [labels[i] for i in filtered_indices[:num_labels]]
+
     def _process_open_ended_responses(
-        self,
-        responses: List[str],
-        num_labels: int
+        self, responses: List[str], num_labels: int
     ) -> List[str]:
         """Process responses for open-ended labeling."""
         pattern = r"^\w+,\s*\w+,\s*\w+"
         word_lists = []
-        
+
         for response in responses:
             words = re.findall(pattern, response)
             if words:
@@ -98,9 +155,11 @@ class TopicLabeler:
         # Get most common terms
         counts = Counter(word for sublist in word_lists for word in sublist)
         if len(counts) < num_labels:
-            raise ValueError(f"Could not generate {num_labels} unique labels from the texts")
-            
-        return [label for label, _ in counts.most_common(num_labels)]
+            raise ValueError(
+                f"Could not generate {num_labels} unique labels from the texts"
+            )
+        labels = self._filter_labels_semantic(counts, num_labels)
+        return labels
 
     def generate_labels(
         self,
@@ -110,12 +169,12 @@ class TopicLabeler:
     ) -> List[str]:
         """
         Generate labels for the given texts in batches.
-        
+
         Args:
             texts: Single text or list of texts to label
             num_labels: Number of labels to generate for open-ended labeling
             candidate_labels: Optional list of predefined labels
-            
+
         Returns:
             List of generated labels
         """
@@ -125,15 +184,22 @@ class TopicLabeler:
         dataset = TextDataset(texts, self.tokenizer)
         dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=False)
         # Calculate max tokens based on labeling mode
+        # NOTE: +2 is janky, but sometimes model outputs something like "a) answer" so meh
+        # for that matter 25 is also janky -- solely for unsupervised labels
         max_tokens = (
-            max(len(self.tokenizer(x)["input_ids"]) for x in (candidate_labels or []))
+            max(
+                len(self.tokenizer(x)["input_ids"]) + 2
+                for x in (candidate_labels or [])
+            )
             if candidate_labels
-            else 50
+            else 25
         )
         all_responses = []
         # Process texts in batches
         for batch_texts in dataloader:
-            prompts = [self._create_prompt(text, candidate_labels) for text in batch_texts]
+            prompts = [
+                self._create_prompt(text, candidate_labels) for text in batch_texts
+            ]
             responses = self._batch_generate(prompts, max_tokens)
             all_responses.extend(responses)
         if not candidate_labels:
@@ -142,9 +208,13 @@ class TopicLabeler:
             # Re-label texts with top labels
             final_labels = []
             for batch_texts in dataloader:
-                prompts = [self._create_prompt(text, top_labels) for text in batch_texts]
+                prompts = [
+                    self._create_prompt(text, top_labels) for text in batch_texts
+                ]
+                max_tokens = max(
+                    len(self.tokenizer(x)["input_ids"]) + 2 for x in (top_labels or [])
+                )
                 batch_responses = self._batch_generate(prompts, max_tokens)
-                
                 for response in batch_responses:
                     label_found = False
                     for label in top_labels:
@@ -154,12 +224,26 @@ class TopicLabeler:
                             break
                     if not label_found:
                         final_labels.append("<err>")
-            
-            return final_labels
+
+            return [
+                response if response in top_labels else "<err>"
+                for response in final_labels
+            ]
+
         else:
             # Handle classification with candidate labels
-            all_responses = [response.strip().strip('.') for response in all_responses]
+            final_labels = []
+            for response in all_responses:
+                label_found = False
+                for candidate_label in candidate_labels:
+                    if candidate_label in response:
+                        final_labels.append(candidate_label)
+                        label_found = True
+                        break
+                if not label_found:
+                    final_labels.append("<err>")
+            all_responses = [response.strip().strip(".") for response in all_responses]
             return [
                 response if response in candidate_labels else "<err>"
-                for response in all_responses
+                for response in final_labels
             ]
