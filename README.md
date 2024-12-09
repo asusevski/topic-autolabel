@@ -1,4 +1,9 @@
 # topic-autolabel
+
+[![Documentation Status](https://readthedocs.org/projects/llama-cpp-python/badge/?version=latest)](https://llama-cpp-python.readthedocs.io/en/latest/?badge=latest)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Python Version](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12-blue.svg)](https://www.python.org)
+
 Given text data, generates labels to classify the data into a set number of topics completely unsupervised.
 
 ---
