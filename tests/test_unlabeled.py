@@ -17,7 +17,7 @@ def test_sentiment_classification():
     """
     np.random.seed(42) 
     df = pd.DataFrame({'text': np.random.choice(['this is a color', 'this is a food', 'this is a movie'], size=100)})
-    def parse_label(text: str) -> str:
+    def parse_label(text: str) -> int:
         if text == "this is a color":
             return 0
         elif text == "this is a food":
@@ -37,7 +37,7 @@ def test_sentiment_classification():
         )
         result_df['label'] = result_df['label']
         y_true = result_df['ground_truth']
-        def parse_pred_label(text: str) -> str:
+        def parse_pred_label(text: str) -> int:
             if text == "color":
                 return 0
             elif text == "food":
