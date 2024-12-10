@@ -6,7 +6,6 @@
 
 Given text data, generates labels to classify the data into a set number of topics completely unsupervised.
 
----
 ## Example usage:
 
 First, install the package with pip: ```pip install topic_autolabel```
