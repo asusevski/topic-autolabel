@@ -30,6 +30,7 @@ def test_unlabeled_classification():
         temp_filepath = f.name
     try:
         result_df = process_file(
+            model_name="llama3.1",
             filepath=temp_filepath,
             text_column="text",
 	        batch_size=8,

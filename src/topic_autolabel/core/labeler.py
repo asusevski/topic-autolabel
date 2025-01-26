@@ -1,11 +1,11 @@
 import re
 from collections import Counter
 from typing import List, Optional, Union
-
 import torch
 from sentence_transformers import SentenceTransformer
 from torch.utils.data import DataLoader, Dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer
+import ollama
 
 
 class TextDataset(Dataset):
@@ -24,23 +24,28 @@ class TextDataset(Dataset):
 class TopicLabeler:
     def __init__(
         self,
-        model_name: str = "meta-llama/Llama-3.1-8B-Instruct",
+        huggingface_model: str,
+        ollama_model: str,
         device: str = "cuda" if torch.cuda.is_available() else "cpu",
         batch_size: int = 8,
     ):
         """
-        Initialize the topic labeler with a specified LLM.
+        Initialize the topic labeler with a specified LLM or LLM service.
         """
-        self.device = device
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name, padding_side="left")
-        if self.tokenizer.pad_token is None:
-            self.tokenizer.pad_token = self.tokenizer.eos_token
-            self.tokenizer.pad_token_id = self.tokenizer.eos_token_id
-        self.model = AutoModelForCausalLM.from_pretrained(
-            model_name,
-            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-        ).to(device)
-        self.batch_size = batch_size
+        if ollama_model == "":
+            self.device = device
+            self.tokenizer = AutoTokenizer.from_pretrained(huggingface_model, padding_side="left")
+            if self.tokenizer.pad_token is None:
+                self.tokenizer.pad_token = self.tokenizer.eos_token
+                self.tokenizer.pad_token_id = self.tokenizer.eos_token_id
+            self.hf_model = AutoModelForCausalLM.from_pretrained(
+                huggingface_model,
+                torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+            ).to(device)
+            self.batch_size = batch_size
+        else:
+            self.ollama_model = ollama_model
+            self.batch_size = batch_size
         self.similarity_model = SentenceTransformer(
             "sentence-transformers/all-MiniLM-L6-v2"
         )
@@ -62,6 +67,13 @@ class TopicLabeler:
         max_new_tokens: int,
     ) -> List[str]:
         """Generate responses for a batch of prompts."""
+        if hasattr(self, 'ollama_model'):
+            responses = []
+            for prompt in prompts:
+                response = ollama.generate(model=self.ollama_model, prompt=prompt)
+                responses.append(response.response)
+            return responses
+        
         # Tokenize all prompts at once
         inputs = self.tokenizer(
             prompts,
@@ -69,7 +81,7 @@ class TopicLabeler:
             truncation=True,
             return_tensors="pt",
         ).to(self.device)
-        outputs = self.model.generate(
+        outputs = self.hf_model.generate(
             input_ids=inputs["input_ids"],
             attention_mask=inputs["attention_mask"],
             max_new_tokens=max_new_tokens,
@@ -85,7 +97,6 @@ class TopicLabeler:
                 output[prompt_length:], skip_special_tokens=True
             )
             responses.append(response.lower().strip())
-        # print(responses)
         return responses
 
     def _filter_labels_semantic(
@@ -181,19 +192,23 @@ class TopicLabeler:
         if isinstance(texts, str):
             texts = [texts]
         # Create dataset and dataloader for batch processing
-        dataset = TextDataset(texts, self.tokenizer)
+        if hasattr(self, 'ollama_model'):
+            dataset = TextDataset(texts, tokenizer=None)
+            max_tokens = 1_000 # TODO: fix this janky tmp, find out how enforce max tokens on ollama
+        else:
+            dataset = TextDataset(texts, self.tokenizer)
+            max_tokens = (
+                max(
+                    len(self.tokenizer(x)["input_ids"]) + 2
+                    for x in (candidate_labels or [])
+                )
+                if candidate_labels
+                else 25
+            )
         dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=False)
         # Calculate max tokens based on labeling mode
         # NOTE: +2 is janky, but sometimes model outputs something like "a) answer" so meh
         # for that matter 25 is also janky -- solely for unsupervised labels
-        max_tokens = (
-            max(
-                len(self.tokenizer(x)["input_ids"]) + 2
-                for x in (candidate_labels or [])
-            )
-            if candidate_labels
-            else 25
-        )
         all_responses = []
         # Process texts in batches
         for batch_texts in dataloader:
@@ -211,9 +226,10 @@ class TopicLabeler:
                 prompts = [
                     self._create_prompt(text, top_labels) for text in batch_texts
                 ]
-                max_tokens = max(
-                    len(self.tokenizer(x)["input_ids"]) + 2 for x in (top_labels or [])
-                )
+                if not hasattr(self, 'ollama_model'):
+                    max_tokens = max(
+                        len(self.tokenizer(x)["input_ids"]) + 2 for x in (top_labels or [])
+                    )
                 batch_responses = self._batch_generate(prompts, max_tokens)
                 for response in batch_responses:
                     label_found = False
@@ -224,7 +240,6 @@ class TopicLabeler:
                             break
                     if not label_found:
                         final_labels.append("<err>")
-
             return [
                 response if response in top_labels else "<err>"
                 for response in final_labels
