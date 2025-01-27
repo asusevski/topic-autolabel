@@ -4,7 +4,7 @@ from typing import List, Optional, Tuple, TypeGuard, overload
 import ollama
 import pandas as pd
 from huggingface_hub import repo_info
-from huggingface_hub.utils import RepositoryNotFoundError, HFValidationError
+from huggingface_hub.utils import HFValidationError, RepositoryNotFoundError
 
 from .core.data_loader import load_data
 from .core.labeler import TopicLabeler
