@@ -15,15 +15,15 @@ requires-python = ">=3.10"
 
 dependencies = [
     "pytest",
-
+    "isort",
     "pandas",
     "datasets",
     "scikit-learn",
-
     "instructor",
     "torch",
     "transformers",
-    "sentence-transformers"
+    "sentence-transformers",
+    "ollama"
 ]
 urls = {Repository = "https://github.com/asusevski/topic-autolabel"}
 
