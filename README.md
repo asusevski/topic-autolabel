@@ -45,3 +45,22 @@ new_df = process_file(
     num_labels=5 # generate up to 5 labels for each of the rows
 )
 ```
+
+## Ollama integration:
+
+Provided you have an ollama server running, you can pass in the tag of the model you want to use to generate labels.
+
+```
+from topic_autolabel import process_file
+import pandas as pd
+
+df = pd.read_csv('path/to/file')
+
+# labelling column "review" with open-ended labels, using llama3.1 hosted with ollama (llama 3.1 must be running, run ollama ps to verify)
+new_df = process_file(
+    df=df,
+    text_column="review",
+    model_name="llama3.1",
+    num_labels=5 # generate up to 5 labels for each of the rows
+)
+```

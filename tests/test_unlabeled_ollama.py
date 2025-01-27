@@ -33,7 +33,6 @@ def test_unlabeled_classification():
             model_name="llama3.1",
             filepath=temp_filepath,
             text_column="text",
-	        batch_size=8,
             num_labels=3
         )
         result_df['label'] = result_df['label']

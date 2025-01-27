@@ -4,7 +4,7 @@ from typing import List, Optional, Tuple, TypeGuard, overload
 import ollama
 import pandas as pd
 from huggingface_hub import repo_info
-from huggingface_hub.utils import RepositoryNotFoundError
+from huggingface_hub.utils import RepositoryNotFoundError, HFValidationError
 
 from .core.data_loader import load_data
 from .core.labeler import TopicLabeler
@@ -51,19 +51,19 @@ def process_file(
         repo_info(model_name)
         huggingface_model = model_name
         ollama_model = ""
-    except RepositoryNotFoundError:
+    except (RepositoryNotFoundError, HFValidationError):
         # check for ollama
-        valid_models = [str(x.model.split(":")[0]) for x in ollama.list().models]
+        valid_models = [str(x.model) for x in ollama.list().models]
         if model_name not in valid_models:
             raise ValueError(
-                f"Model '{model_name}' not found in the HuggingFace Hub nor is it currently being served by ollama."
+                f"Model '{model_name}' not found in the HuggingFace Hub nor is it currently being served by ollama. Models found: {valid_models}"
             )
         else:
             try:
                 ollama.chat(model_name)
             except ConnectionError:
                 raise ValueError(
-                    f"Ollama model {model_name} detected, but server unavailable. Ensure server is available."
+                    f"Ollama model {model_name} detected, but server unavailable. Ensure server is available. Models found: {valid_models}"
                 )
         huggingface_model = ""
         ollama_model = model_name
