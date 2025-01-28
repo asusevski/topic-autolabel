@@ -12,7 +12,7 @@ from .core.labeler import TopicLabeler
 
 def process_file(
     filepath: Optional[str | Path],
-    text_column: str,
+    text_column: Optional[str],
     df: Optional[pd.DataFrame] = None,
     model_name: str = "meta-llama/Llama-3.1-8B-Instruct",
     num_labels: Optional[int] = 5,
@@ -44,13 +44,18 @@ def process_file(
         raise ValueError("One of num_labels or candidate_labels must be provided")
 
     if filepath is not None:
-        df = load_data(filepath, text_column)
+        dtype, df = load_data(filepath, text_column)
+    else:
+        dtype = "text"
 
     # Find out if model points to an ollama model running on a server or a huggingface model
     try:
         repo_info(model_name)
         huggingface_model = model_name
         ollama_model = ""
+        # TODO: make this not dumb
+        if dtype != "text":
+            raise ValueError("Found non-text data and a HuggingFace model path, please only run with Ollama.")
     except (RepositoryNotFoundError, HFValidationError):
         # check for ollama
         valid_models = [str(x.model) for x in ollama.list().models]
@@ -73,17 +78,27 @@ def process_file(
         huggingface_model=huggingface_model,
         ollama_model=ollama_model,
         batch_size=batch_size,
+        dtype=dtype
     )
 
     # Generate labels
-    labels = labeler.generate_labels(
-        df[text_column].tolist(),
-        num_labels=num_labels,
-        candidate_labels=candidate_labels,
-    )
-
+    if dtype=="text":
+        labels = labeler.generate_labels(
+            texts=df[text_column].tolist(),
+            num_labels=num_labels,
+            candidate_labels=candidate_labels,
+        )
+        #TODO: make sure this column doesn't already exist in df
+        df["label"] = labels
+    else:
+        labels = labeler.generate_labels(
+            df=df,
+            num_labels=num_labels,
+            candidate_labels=candidate_labels,
+        )
+        #TODO: make sure this column doesn't already exist in df
+        df["label"] = labels
     # Add labels to dataframe
-    df["label"] = labels
 
     return df
 

@@ -8,6 +8,8 @@ from sentence_transformers import SentenceTransformer
 from torch.utils.data import DataLoader, Dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
+from .data_loader import DataType
+import pandas as pd
 
 class TextDataset(Dataset):
     def __init__(self, texts: List[str], tokenizer, max_length: int = 512):
@@ -29,11 +31,16 @@ class TopicLabeler:
         ollama_model: str,
         device: str = "cuda" if torch.cuda.is_available() else "cpu",
         batch_size: int = 8,
+        dtype: DataType = "text"
     ):
         """
         Initialize the topic labeler with a specified LLM or LLM service.
         """
         if ollama_model == "":
+            #TODO: gracefully fix this
+            if dtype != "text":
+                raise ValueError("Found non-text data and a HuggingFace model path, please only run with Ollama.")
+                
             self.device = device
             self.tokenizer = AutoTokenizer.from_pretrained(
                 huggingface_model, padding_side="left"
@@ -56,15 +63,24 @@ class TopicLabeler:
         )
         if torch.cuda.is_available():
             self.similarity_model.to(device)
+        self.dtype = dtype
 
     def _create_prompt(
-        self, text: str, candidate_labels: Optional[List[str]] = None
+        self, 
+        text: Optional[str],
+        candidate_labels: Optional[List[str]] = None,
+        dtype: DataType = "text"
     ) -> str:
         """Generate appropriate prompt based on labeling mode."""
-        if candidate_labels:
-            return f"Given the following text, classify it into one of these categories: {', '.join(candidate_labels)}\n\nText: {text}\n\nThe category that best describes this text is:"
-        return f"Use three words total (comma separated) to describe general topics in above texts. Under no circumstances use enumeration. Example format: Tree, Cat, Fireman\n\nText: {text}\nThree comma separated words:"
-
+        if dtype == "text":
+            if candidate_labels:
+                return f"Given the following text, classify it into one of these categories: {', '.join(candidate_labels)}\n\nText: {text}\n\nThe category that best describes this text is:"
+            return f"Use three words total (comma separated) to describe general topics in above texts. Under no circumstances use enumeration. Example format: Tree, Cat, Fireman\n\nText: {text}\nThree comma separated words:"
+        else:
+            if candidate_labels: 
+                return f"Classify the image into one of these categories: {', '.join(candidate_labels)}\n\nThe category that best describes this image is:"
+            return f"Use three words total (comma separated) to describe the image. Under no circumstances use enumeration. Example format: Tree, Cat, Fireman\n\nThree comma separated words:"
+    
     @torch.no_grad()
     def _batch_generate(
         self,
@@ -179,7 +195,8 @@ class TopicLabeler:
 
     def generate_labels(
         self,
-        texts: Union[str, List[str]],
+        texts: Optional[Union[str, List[str]]] = None,
+        df: Optional[pd.DataFrame] = None,
         num_labels: int = 5,
         candidate_labels: Optional[List[str]] = None,
     ) -> List[str]:
@@ -194,6 +211,23 @@ class TopicLabeler:
         Returns:
             List of generated labels
         """
+        if self.dtype != "text":
+            prompt = self._create_prompt(text=None,candidate_labels=candidate_labels, dtype=self.dtype)
+            assert(type(df) is pd.DataFrame)
+            #TODO: singular label, make it work for dirs
+            image_fpath = df.loc[0, 'filepath']
+            if self.dtype == "video":
+                raise NotImplementedError("unlucky")
+            response = ollama.chat(
+                model=self.ollama_model,
+                messages=[{
+                    'role': 'user',
+                    'content': prompt,
+                    'images': [image_fpath]
+                }]
+            ).message.content
+            return [response]
+
         if isinstance(texts, str):
             texts = [texts]
         # Create dataset and dataloader for batch processing
