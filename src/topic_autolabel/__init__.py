@@ -12,12 +12,12 @@ from .core.labeler import TopicLabeler
 
 def process_file(
     filepath: Optional[str | Path],
-    text_column: Optional[str],
+    text_column: Optional[str] = None,
     df: Optional[pd.DataFrame] = None,
     model_name: str = "meta-llama/Llama-3.1-8B-Instruct",
     num_labels: Optional[int] = 5,
     candidate_labels: Optional[List[str]] = None,
-    batch_size: int = 8,
+    batch_size: Optional[int] = 8,
 ) -> pd.DataFrame:
     """
     Process a file and add topic labels to it.
@@ -55,7 +55,9 @@ def process_file(
         ollama_model = ""
         # TODO: make this not dumb
         if dtype != "text":
-            raise ValueError("Found non-text data and a HuggingFace model path, please only run with Ollama.")
+            raise ValueError(
+                "Found non-text data and a HuggingFace model path, please only run with Ollama."
+            )
     except (RepositoryNotFoundError, HFValidationError):
         # check for ollama
         valid_models = [str(x.model) for x in ollama.list().models]
@@ -78,17 +80,17 @@ def process_file(
         huggingface_model=huggingface_model,
         ollama_model=ollama_model,
         batch_size=batch_size,
-        dtype=dtype
+        dtype=dtype,
     )
 
     # Generate labels
-    if dtype=="text":
+    if dtype == "text":
         labels = labeler.generate_labels(
             texts=df[text_column].tolist(),
             num_labels=num_labels,
             candidate_labels=candidate_labels,
         )
-        #TODO: make sure this column doesn't already exist in df
+        # TODO: make sure this column doesn't already exist in df
         df["label"] = labels
     else:
         labels = labeler.generate_labels(
@@ -96,7 +98,7 @@ def process_file(
             num_labels=num_labels,
             candidate_labels=candidate_labels,
         )
-        #TODO: make sure this column doesn't already exist in df
+        # TODO: make sure this column doesn't already exist in df
         df["label"] = labels
     # Add labels to dataframe
 

@@ -3,13 +3,14 @@ from collections import Counter
 from typing import List, Optional, Union
 
 import ollama
+import pandas as pd
 import torch
 from sentence_transformers import SentenceTransformer
 from torch.utils.data import DataLoader, Dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from .data_loader import DataType
-import pandas as pd
+
 
 class TextDataset(Dataset):
     def __init__(self, texts: List[str], tokenizer, max_length: int = 512):
@@ -30,17 +31,19 @@ class TopicLabeler:
         huggingface_model: str,
         ollama_model: str,
         device: str = "cuda" if torch.cuda.is_available() else "cpu",
-        batch_size: int = 8,
-        dtype: DataType = "text"
+        batch_size: Optional[int] = 8,
+        dtype: DataType = "text",
     ):
         """
         Initialize the topic labeler with a specified LLM or LLM service.
         """
         if ollama_model == "":
-            #TODO: gracefully fix this
+            # TODO: gracefully fix this
             if dtype != "text":
-                raise ValueError("Found non-text data and a HuggingFace model path, please only run with Ollama.")
-                
+                raise ValueError(
+                    "Found non-text data and a HuggingFace model path, please only run with Ollama."
+                )
+
             self.device = device
             self.tokenizer = AutoTokenizer.from_pretrained(
                 huggingface_model, padding_side="left"
@@ -66,10 +69,10 @@ class TopicLabeler:
         self.dtype = dtype
 
     def _create_prompt(
-        self, 
+        self,
         text: Optional[str],
         candidate_labels: Optional[List[str]] = None,
-        dtype: DataType = "text"
+        dtype: DataType = "text",
     ) -> str:
         """Generate appropriate prompt based on labeling mode."""
         if dtype == "text":
@@ -77,10 +80,10 @@ class TopicLabeler:
                 return f"Given the following text, classify it into one of these categories: {', '.join(candidate_labels)}\n\nText: {text}\n\nThe category that best describes this text is:"
             return f"Use three words total (comma separated) to describe general topics in above texts. Under no circumstances use enumeration. Example format: Tree, Cat, Fireman\n\nText: {text}\nThree comma separated words:"
         else:
-            if candidate_labels: 
+            if candidate_labels:
                 return f"Classify the image into one of these categories: {', '.join(candidate_labels)}\n\nThe category that best describes this image is:"
-            return f"Use three words total (comma separated) to describe the image. Under no circumstances use enumeration. Example format: Tree, Cat, Fireman\n\nThree comma separated words:"
-    
+            return "Use three words total (comma separated) to describe the image. Under no circumstances use enumeration. Example format: Tree, Cat, Fireman\n\nThree comma separated words:"
+
     @torch.no_grad()
     def _batch_generate(
         self,
@@ -211,24 +214,35 @@ class TopicLabeler:
         Returns:
             List of generated labels
         """
-        if self.dtype != "text":
-            prompt = self._create_prompt(text=None,candidate_labels=candidate_labels, dtype=self.dtype)
-            assert(type(df) is pd.DataFrame)
-            #TODO: singular label, make it work for dirs
-            if self.dtype == "video":
-                raise NotImplementedError("unlucky")
+        if self.dtype == "image":
+            prompt = self._create_prompt(
+                text=None, candidate_labels=candidate_labels, dtype=self.dtype
+            )
+            assert type(df) is pd.DataFrame
             all_responses = []
-            for fpath in df['filepath']:
+            for fpath in df["filepath"]:
                 response = ollama.chat(
                     model=self.ollama_model,
-                    messages=[{
-                        'role': 'user',
-                        'content': prompt,
-                        'images': [fpath]
-                    }]
+                    messages=[{"role": "user", "content": prompt, "images": [fpath]}],
                 ).message.content
                 all_responses.append(response)
-            return all_responses
+            if candidate_labels is not None:
+                return all_responses
+            top_labels = self._process_open_ended_responses(all_responses, num_labels)
+            # Re-label texts with top labels
+            final_labels = []
+            prompt = self._create_prompt(
+                text=None, candidate_labels=top_labels, dtype=self.dtype
+            )
+            for fpath in df["filepath"]:
+                response = ollama.chat(
+                    model=self.ollama_model,
+                    messages=[{"role": "user", "content": prompt, "images": [fpath]}],
+                ).message.content
+                final_labels.append(response)
+            return final_labels
+        elif self.dtype == "video":
+            raise NotImplementedError("To do")
 
         if isinstance(texts, str):
             texts = [texts]
