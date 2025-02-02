@@ -20,7 +20,7 @@ def test_unlabeled_classification():
         result_df = process_file(
             filepath="./tests/imgs",
             text_column="text",
-            model_name="llama3.2:latest",
+            model_name="llama3.2-vision:latest",
             batch_size=8,
             num_labels=3
         )
