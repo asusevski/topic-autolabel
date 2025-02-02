@@ -22,8 +22,7 @@ def test_unlabeled_img_labelling():
         result_df = process_file(
             filepath="./tests/imgs",
             model_name="llama3.2-vision:latest",
-            candidate_labels=["anime", "food", "astrophysics"],
-            num_labels=None
+            num_labels=3
         )
         for elem in result_df['label']:
             assert "anime" in elem.lower()
