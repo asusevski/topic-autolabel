@@ -42,18 +42,33 @@ def load_data(
     if not filepath.exists():
         raise FileNotFoundError(f"No file found at {filepath}")
 
-    file_type = detect_file_type(filepath)
-    
-    if file_type == 'text':
-        df = pd.read_csv(filepath)
-        if text_column and text_column not in df.columns:
-            raise ValueError(f"Column {text_column} not found in the CSV file")
-        return "text", df
+    if filepath.is_dir():
+        image_files = [
+            f for f in filepath.rglob("*") 
+            if f.is_file() and detect_file_type(f)=="image"
+        ]
         
-    elif file_type == 'image':
-        #TODO: process image for transformers implementations
-        return "image", pd.DataFrame({"filepath": [filepath]})
-        
+        if not image_files:
+            raise ValueError(f"No image files found in directory {filepath}")
+            
+        df = pd.DataFrame({
+            'filepath': [str(f) for f in image_files]
+        })
+        return "image", df
     else:
-        #TODO: process video for transformers implementations
-        return "video", pd.DataFrame({"filepath": [filepath]})
+
+        file_type = detect_file_type(filepath)
+        
+        if file_type == 'text':
+            df = pd.read_csv(filepath)
+            if text_column and text_column not in df.columns:
+                raise ValueError(f"Column {text_column} not found in the CSV file")
+            return "text", df
+            
+        elif file_type == 'image':
+            #TODO: process image for transformers implementations
+            return "image", pd.DataFrame({"filepath": [filepath]})
+            
+        else:
+            #TODO: process video for transformers implementations
+            return "video", pd.DataFrame({"filepath": [filepath]})

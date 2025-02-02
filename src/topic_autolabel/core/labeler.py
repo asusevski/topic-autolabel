@@ -215,18 +215,20 @@ class TopicLabeler:
             prompt = self._create_prompt(text=None,candidate_labels=candidate_labels, dtype=self.dtype)
             assert(type(df) is pd.DataFrame)
             #TODO: singular label, make it work for dirs
-            image_fpath = df.loc[0, 'filepath']
             if self.dtype == "video":
                 raise NotImplementedError("unlucky")
-            response = ollama.chat(
-                model=self.ollama_model,
-                messages=[{
-                    'role': 'user',
-                    'content': prompt,
-                    'images': [image_fpath]
-                }]
-            ).message.content
-            return [response]
+            all_responses = []
+            for fpath in df['filepath']:
+                response = ollama.chat(
+                    model=self.ollama_model,
+                    messages=[{
+                        'role': 'user',
+                        'content': prompt,
+                        'images': [fpath]
+                    }]
+                ).message.content
+                all_responses.append(response)
+            return all_responses
 
         if isinstance(texts, str):
             texts = [texts]
