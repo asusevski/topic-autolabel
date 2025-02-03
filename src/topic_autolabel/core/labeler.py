@@ -44,7 +44,6 @@ class TopicLabeler:
                     "Found non-text data and a HuggingFace model path, please only run with Ollama."
                 )
 
-            self.device = device
             self.tokenizer = AutoTokenizer.from_pretrained(
                 huggingface_model, padding_side="left"
             )
@@ -59,6 +58,7 @@ class TopicLabeler:
             ).to(device)
             self.batch_size = batch_size
         else:
+            self.device = device
             self.ollama_model = ollama_model
             self.batch_size = batch_size
         self.similarity_model = SentenceTransformer(
