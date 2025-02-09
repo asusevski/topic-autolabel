@@ -260,6 +260,7 @@ class TopicLabeler:
                         ).message.content
                         all_responses.append(response)
                         if candidate_labels is not None:
+                            #TODO: this will break stuff
                             return all_responses
                         top_labels = self._process_open_ended_responses(all_responses,num_labels)
                         final_labels = []
@@ -272,8 +273,8 @@ class TopicLabeler:
                                 messages=[{"role": "user", "content": prompt, "images": [frame_path]}],
                             ).message.content
                             final_labels.append(response)
-                        video_label = max(final_labels,key=final_labels.count)
-                        all_video_responses.append(video_label)
+                    video_label = max(final_labels,key=final_labels.count)
+                    all_video_responses.append(video_label)
                 finally:
                     cleanup_frames(output_dir)
             return all_video_responses
