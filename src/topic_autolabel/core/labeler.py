@@ -251,6 +251,7 @@ class TopicLabeler:
             for fpath in df["filepath"]:
                 # split video into frames
                 output_dir, frame_paths = extract_video_frames(fpath)
+                all_responses = []
                 try:
                     for frame_path in frame_paths:
                         response = ollama.chat(
