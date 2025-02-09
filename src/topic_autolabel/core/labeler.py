@@ -260,7 +260,7 @@ class TopicLabeler:
                         all_responses.append(response)
                         if candidate_labels is not None:
                             return all_responses
-                        top_labels = self.process_open_ended_responses(all_responses,num_labels)
+                        top_labels = self._process_open_ended_responses(all_responses,num_labels)
 
                         final_labels = []
                         prompt = self._create_prompt(
