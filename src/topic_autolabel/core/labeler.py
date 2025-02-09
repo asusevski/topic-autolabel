@@ -48,6 +48,7 @@ class TopicLabeler:
             self.tokenizer = AutoTokenizer.from_pretrained(
                 huggingface_model, padding_side="left"
             )
+            self.device = device
             if self.tokenizer.pad_token is None:
                 self.tokenizer.pad_token = self.tokenizer.eos_token
                 self.tokenizer.pad_token_id = self.tokenizer.eos_token_id
@@ -56,7 +57,7 @@ class TopicLabeler:
                 torch_dtype=(
                     torch.float16 if torch.cuda.is_available() else torch.float32
                 ),
-            ).to(device)
+            ).to(self.device)
             self.batch_size = batch_size
         else:
             self.device = device
@@ -98,7 +99,6 @@ class TopicLabeler:
                 response = ollama.generate(model=self.ollama_model, prompt=prompt)
                 responses.append(response.response)
             return responses
-
         # Tokenize all prompts at once
         inputs = self.tokenizer(
             prompts,
