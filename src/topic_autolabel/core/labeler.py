@@ -10,6 +10,7 @@ from torch.utils.data import DataLoader, Dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from .data_loader import DataType
+from .video_loader import extract_video_frames, cleanup_frames
 
 
 class TextDataset(Dataset):
@@ -242,7 +243,54 @@ class TopicLabeler:
                 final_labels.append(response)
             return final_labels
         elif self.dtype == "video":
-            raise NotImplementedError("To do")
+            prompt = self._create_prompt(
+                text=None, candidate_labels=candidate_labels, dtype=self.dtype
+            )
+            assert type(df) is pd.DataFrame
+            all_responses = []
+            for fpath in df["filepath"]:
+                # split video into frames
+                output_dir, frame_paths = extract_video_frames(fpath)
+                try:
+                    for frame_path in frame_paths:
+                        response = ollama.chat(
+                        model=self.ollama_model,
+                            messages=[{"role":"user", "content": prompt, "images": [frame_path]}],
+                        ).message.content
+                        all_responses.append(response)
+                        if candidate_labels is not None:
+                            return all_responses
+                        top_labels = self.process_open_ended_responses(all_responses,num_labels)
+
+                        final_labels = []
+                        prompt = self._create_prompt(
+                            text=None, candidate_labels=top_labels, dtype=self.dtype
+                        )
+                        for frame_path in frame_paths:
+                            response = ollama.chat(
+                                model=self.ollama_model,
+                                messages=[{"role": "user", "content": prompt, "images": [frame_path]}],
+                            ).message.content
+                            final_labels.append(response)
+                        return final_labels
+                finally:
+                    cleanup_frames(output_dir)
+
+            if candidate_labels is not None:
+                return all_responses
+            top_labels = self._process_open_ended_responses(all_responses, num_labels)
+            # Re-label texts with top labels
+            final_labels = []
+            prompt = self._create_prompt(
+                text=None, candidate_labels=top_labels, dtype=self.dtype
+            )
+            for fpath in df["filepath"]:
+                response = ollama.chat(
+                    model=self.ollama_model,
+                    messages=[{"role": "user", "content": prompt, "images": [fpath]}],
+                ).message.content
+                final_labels.append(response)
+            return final_labels
 
         if isinstance(texts, str):
             texts = [texts]
