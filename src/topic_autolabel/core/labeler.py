@@ -247,7 +247,7 @@ class TopicLabeler:
                 text=None, candidate_labels=candidate_labels, dtype=self.dtype
             )
             assert type(df) is pd.DataFrame
-            all_responses = []
+            all_video_responses = []
             for fpath in df["filepath"]:
                 # split video into frames
                 output_dir, frame_paths = extract_video_frames(fpath)
@@ -261,7 +261,6 @@ class TopicLabeler:
                         if candidate_labels is not None:
                             return all_responses
                         top_labels = self._process_open_ended_responses(all_responses,num_labels)
-
                         final_labels = []
                         prompt = self._create_prompt(
                             text=None, candidate_labels=top_labels, dtype=self.dtype
@@ -272,25 +271,11 @@ class TopicLabeler:
                                 messages=[{"role": "user", "content": prompt, "images": [frame_path]}],
                             ).message.content
                             final_labels.append(response)
-                        return final_labels
+                        video_label = max(final_labels,key=final_labels.count)
+                        all_video_responses.append(video_label)
                 finally:
                     cleanup_frames(output_dir)
-
-            if candidate_labels is not None:
-                return all_responses
-            top_labels = self._process_open_ended_responses(all_responses, num_labels)
-            # Re-label texts with top labels
-            final_labels = []
-            prompt = self._create_prompt(
-                text=None, candidate_labels=top_labels, dtype=self.dtype
-            )
-            for fpath in df["filepath"]:
-                response = ollama.chat(
-                    model=self.ollama_model,
-                    messages=[{"role": "user", "content": prompt, "images": [fpath]}],
-                ).message.content
-                final_labels.append(response)
-            return final_labels
+            return all_video_responses
 
         if isinstance(texts, str):
             texts = [texts]
